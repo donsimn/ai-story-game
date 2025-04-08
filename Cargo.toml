@@ -1,0 +1,11 @@
+[package]
+name = "story"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+color-eyre = "0.6.3"
+crossterm = "0.28.1"
+ollama-rs = "0.2.6"
+ratatui = { version = "0.29.0", features = ["all-widgets"] }
+tokio = { version = "1.44.1", features = ["full"] }
