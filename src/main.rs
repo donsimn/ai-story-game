@@ -1,6 +1,10 @@
-use ollama_rs::Ollama;
+use color_eyre::owo_colors::OwoColorize;
+use ollama_rs::generation::parameters::{JsonSchema, JsonStructure};
+use ollama_rs::{generation::parameters::FormatType, Ollama};
 use ollama_rs::generation::completion::request::GenerationRequest;
-use std::{io, sync::Arc, sync::RwLock};
+use serde::Deserialize;
+use serde_json::json;
+use std::{io, ops::{AddAssign, SubAssign}, sync::{Arc, RwLock}};
 use tokio::runtime::Runtime;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
@@ -13,6 +17,14 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget, Wrap},
     DefaultTerminal, Frame,
 };
+
+
+#[derive(JsonSchema, Deserialize, Debug)]
+struct OutputSchema {
+    story: String,
+    health_difference: usize,
+    options: Vec<String>,
+}
 
 pub struct App {
     story: Arc<RwLock<String>>,
@@ -33,7 +45,6 @@ impl Default for App {
             runtime: Runtime::new().unwrap(), // Initialize Tokio runtime
         }
     }
-
 }
 
 impl App {
@@ -67,28 +78,28 @@ impl App {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('1') => {
-                self.story.as_ref().write().unwrap().push_str("You chose option 1\n");
+                self.story.write().unwrap().push_str("You chose option 1\n");
             },
             KeyCode::Char('2') => {
-                self.story.as_ref().write().unwrap().push_str("You chose option 1\n");
+                self.story.write().unwrap().push_str("You chose option 2\n");
             },
             KeyCode::Char('3') => {
-                self.health -= 10;
+                self.health.write().unwrap().sub_assign(10);
             },
             KeyCode::Char('4') => {
-                self.health += 10;
+                self.health.write().unwrap().add_assign(10);
             },
             KeyCode::Char('5') => {
-                self.story = "You chose option 5".to_string();
+                self.story.write().unwrap().push_str("You chose option 5");
             },
             KeyCode::Char('6') => {
-                self.generate_story("Write a short story about a dog named cat.");
+                self.generate_story("Create a 32x16 ASCII art of a janos");
             },
             _ => {}
         }
     }
 
-        fn exit(&mut self) {
+    fn exit(&mut self) {
         self.exit = true;
     }
 
@@ -97,15 +108,22 @@ impl App {
         let prompt = prompt.to_string();
         let story_ref = self.story.clone();
 
+
+
+
+
         self.runtime.spawn(async move {
-            let request = GenerationRequest::new("llama3".to_string(), prompt.to_string());
+
+            let format = FormatType::StructuredJson(JsonStructure::new::<OutputSchema>());
+
+            let request = GenerationRequest::new("llama3.2".to_string(), prompt.to_string()).format(format);
             match ollama.generate(request).await {
                 Ok(response) => {
-                    story_ref.push_str("\n");
-                    story_ref.push_str(&response.response);
+                    story_ref.as_ref().write().unwrap().push_str("\n");
+                    story_ref.as_ref().write().unwrap().push_str(&response.response);
                 }
                 Err(e) => {
-                    story_ref.push_str("\n[ERROR: Failed to generate response]");
+                    story_ref.as_ref().write().unwrap().push_str("\n[ERROR: Failed to generate response]");
                     eprintln!("Ollama error: {:?}", e);
                 }
             }
@@ -130,8 +148,8 @@ impl Widget for &App {
         let healthbar = Line::from(vec![
             format!(
                 " {}{} ",
-                "■".repeat(self.health / 2).red(),
-                "□".repeat((100 - self.health) / 2)
+                "■".repeat(self.health.read().unwrap().clone() / 2).red(),
+                "□".repeat((100 - self.health.read().unwrap().clone()) / 2)
             ).into(),
         ]);
 
@@ -141,7 +159,7 @@ impl Widget for &App {
             .border_set(border::THICK);
 
         // Ensure line breaks are handled
-        let story_text = Text::from(self.story.clone()).yellow(); 
+        let story_text = Text::from(self.story.read().unwrap().clone()).yellow(); 
 
         Paragraph::new(story_text)
             .centered()
