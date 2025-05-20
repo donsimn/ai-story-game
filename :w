@@ -1,12 +1,14 @@
 use color_eyre::owo_colors::OwoColorize;
-use color_eyre::owo_colors::Rgb;
+use crossterm::style::Stylize;
 use ollama_rs::generation::parameters::JsonStructure;
+use ollama_rs::generation::parameters::JsonSchema;
 use ollama_rs::{generation::parameters::FormatType, Ollama};
 use ollama_rs::generation::completion::request::GenerationRequest;
 use serde::Deserialize;
 use serde_json::json;
 use std::{io, ops::{AddAssign, SubAssign}, sync::{Arc, RwLock}};
 use tokio::runtime::Runtime;
+use colored::Colorize;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -82,7 +84,7 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('g') => {
             
-                let prompt = format!("You are an interactive story generator for an AI game. ¸\nTheme: {}\nGenerate a story that follows this structure:\n\n1. Story & Setting:\n- Create a vivid, immersive narrative based on the theme.\n- Introduce the main character and the world they’re in.\n- The story at the beginning should be a minimum of 3 and a maximum of 6 sentences long.\n\n2. Health Bar Mechanic:\n- The main character starts with a full health bar (e.g., 100).\n- Throughout the story, include events that either damage or heal them.\n- Clearly indicate all health changes.\n\n3. Decision Point:\n- End the story with a moment where the player must choose between at least two actions.\n- List each option clearly, and briefly explain the outcome and health impact.\n- If the health bar drops to 0, the character dies and the game ends.\n\nOutput format:\n- Story: The full narrative leading up to the decision.\n- Health: The current health value and how it changed.\n- Choices: A structured list of available decisions with consequences", "Short, janos alone in the desert");
+                let prompt = format!("You are an interactive story generator for an AI game. ¸\nTheme: {}\nGenerate a story that follows this structure:\n\n1. Story & Setting:\n- Create a vivid, immersive narrative based on the theme.\n- Introduce the main character and the world they’re in.\n\n2. Health Bar Mechanic:\n- The main character starts with a full health bar (e.g., 100).\n- Throughout the story, include events that either damage or heal them.\n- Clearly indicate all health changes.\n\n3. Decision Point:\n- End the story with a moment where the player must choose between at least two actions.\n- List each option clearly, and briefly explain the outcome and health impact.\n- If the health bar drops to 0, the character dies and the game ends.", "Short, about swiss history");
 
                 self.generate_story(&prompt);
             },
@@ -95,7 +97,7 @@ impl App {
                         self.story.push_str(&format!("You chose option {}: {}\n", index, option));
 
                         
-                        let prompt = format!("You are an interactive story generator for an AI game that continues from previous decisions. Generate the next part of the story based on the player’s last choice and previous events. Follow this structure:\n\n1. Continue the Story:\n- Use the previous story, healthpoints and the player’s selected option.\n- Write a new story segment (3 to 6 sentences long) that logically follows from the decision.\n- Include the direct consequences of the player’s decision in this segment (e.g., gained an item, took damage, found something hidden).\n\n2. Health Bar Mechanic:\n- The character’s health should only be influenced by the player’s choices.\n- Reflect any health gain or loss that resulted from the previous decision.\n- Update and display the health bar before presenting the next decision.\n\n3. Decision Point:\n- Present at least two new choices for the player.\n- List each option clearly and explain the expected outcome and its impact on the character’s health.\n- Do not continue the story after presenting the choices — stop and wait for the player to select an option.\n- If the health bar reaches 0, the character dies and the game ends.\n\nOutput format:\n- Story: A 3–6 sentence narrative that reflects the last decision and sets up the next choice.\n- Health: The current health value and how it changed (e.g., Health: 75 (-10)).\n- Choices: A structured list of new available decisions with consequences and health impact. This what happened previously with the players choises: \n\n {}",self.story);
+                        let prompt = format!("You are an interactive story generator for an AI game. ¸\nTheme: {}\nContinue the story that follows this structure:\n\n1. Story & Setting:\n- Create a vivid, immersive narrative based on the theme.\n- Introduce the main character and the world they’re in.\n\n2. Health Bar Mechanic:\n- The main character starts with a full health bar (e.g., 100).\n- Throughout the story, include events that either damage or heal them.\n- Clearly indicate all health changes.\n\n3. Decision Point:\n- End the story with a moment where the player must choose between at least two actions.\n- List each option clearly, and briefly explain the outcome and health impact.\n- If the health bar drops to 0, the character dies and the game ends. Here's what already happened and the players choises: {}", "Short, about swiss history", self.story);
 
                         self.generate_story(&prompt);
 
@@ -167,7 +169,7 @@ impl App {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }  
 
-        self.story = story_ref.read().unwrap().clone();
+        self.story = story_ref.read().unwrap().clone().yellow();
         self.health = *health_ref.read().unwrap();
         let options = options_ref.read().unwrap().clone();
 
@@ -177,8 +179,7 @@ impl App {
 
             self.story.push_str("\n\nOptions:\n");
             for (i, option) in options.iter().enumerate() {
-                let color = Rgb(0, 255 / (options.len() as u8 + 1) * (i as u8 +2), 0);
-                self.story.push_str(&format!("{}: {}\n", i + 1, option).color(color).to_string());
+                self.story.push_str(&format!("{}: {}\n", i + 1, option).blue());
             }
         } else {
             self.story.push_str("\n\nNo options available.\n");
